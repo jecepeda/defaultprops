@@ -32,6 +32,10 @@ func boolPointer(b bool) *bool {
 	return &b
 }
 
+func complexPointer(c complex128) *complex128 {
+	return &c
+}
+
 func chanPointer(c chan bool) *chan bool {
 	if c != nil {
 		return &c
@@ -77,8 +81,9 @@ type substruct struct {
 
 func TestSubstitute(t *testing.T) {
 	type args struct {
-		orig interface{}
-		dest interface{}
+		orig   interface{}
+		dest   interface{}
+		config defaultprops.Config
 	}
 	tests := []struct {
 		name     string
@@ -121,6 +126,18 @@ func TestSubstitute(t *testing.T) {
 			expected: stringPointer("1234"),
 		},
 		{
+			name: "string skip non zero",
+			args: args{
+				orig: stringPointer("123"),
+				dest: stringPointer("1234"),
+				config: defaultprops.Config{
+					SkipIfNonZeroValue: true,
+				},
+			},
+			wantErr:  false,
+			expected: stringPointer("1234"),
+		},
+		{
 			name: "float32 set",
 			args: args{
 				orig: float32Pointer(3),
@@ -143,6 +160,14 @@ func TestSubstitute(t *testing.T) {
 				dest: float64Pointer(4),
 			},
 			expected: float64Pointer(4),
+		},
+		{
+			name: "uint set",
+			args: args{
+				orig: uintPointer(12),
+				dest: uintPointer(23),
+			},
+			expected: uintPointer(12),
 		},
 		{
 			name: "uint not set",
@@ -169,12 +194,20 @@ func TestSubstitute(t *testing.T) {
 			expected: intPointer(23),
 		},
 		{
-			name: "uint set",
+			name: "complex set",
 			args: args{
-				orig: uintPointer(12),
-				dest: uintPointer(23),
+				orig: complexPointer(128),
+				dest: complexPointer(20),
 			},
-			expected: uintPointer(12),
+			expected: complexPointer(128),
+		},
+		{
+			name: "complex not set",
+			args: args{
+				orig: complexPointer(0),
+				dest: complexPointer(23),
+			},
+			expected: complexPointer(23),
 		},
 		{
 			name: "bool set",
@@ -183,6 +216,17 @@ func TestSubstitute(t *testing.T) {
 				dest: boolPointer(false),
 			},
 			expected: boolPointer(true),
+		},
+		{
+			name: "bool with config: set false bools",
+			args: args{
+				orig: boolPointer(false),
+				dest: boolPointer(true),
+				config: defaultprops.Config{
+					SetFalseBools: true,
+				},
+			},
+			expected: boolPointer(false),
 		},
 		{
 			name: "chan set",
@@ -249,6 +293,17 @@ func TestSubstitute(t *testing.T) {
 			expected: mapPointer(map[string]string{"1": "2"}),
 		},
 		{
+			name: "map with config does not merge",
+			args: args{
+				orig: mapPointer(map[string]string{"1": "234"}),
+				dest: mapPointer(map[string]string{"2": "2"}),
+				config: defaultprops.Config{
+					ReplaceMaps: true,
+				},
+			},
+			expected: mapPointer(map[string]string{"1": "234"}),
+		},
+		{
 			name: "function set: ignore",
 			args: args{
 				orig: &notSoFakeFunc,
@@ -282,6 +337,59 @@ func TestSubstitute(t *testing.T) {
 		},
 		{
 			name: "struct set",
+			args: args{
+				orig: &testStruct{
+					Int:    2,
+					String: "2",
+					Bool:   true,
+					Float:  3.4,
+					InnerPtrStruct: &substruct{
+						PtrInt: intPointer(20),
+					},
+				},
+				dest: &testStruct{
+					InnerPtrStruct: &substruct{
+						PtrInt: intPointer(30),
+					},
+				},
+			},
+			expected: &testStruct{
+				Int:    2,
+				String: "2",
+				Bool:   true,
+				Float:  3.4,
+				InnerPtrStruct: &substruct{
+					PtrInt: intPointer(20),
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := defaultprops.Substitute(tt.args.orig, tt.args.dest, tt.args.config)
+			if tt.wantErr {
+				assert.NotNil(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, tt.args.dest)
+			}
+		})
+	}
+}
+
+func TestSubstituteNonConfig(t *testing.T) {
+	type args struct {
+		orig interface{}
+		dest interface{}
+	}
+	tests := []struct {
+		name     string
+		args     args
+		wantErr  bool
+		expected interface{}
+	}{
+		{
+			name: "struct with no config",
 			args: args{
 				orig: &testStruct{
 					Int:    2,

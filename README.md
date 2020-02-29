@@ -19,7 +19,7 @@ type MyStruct struct {
 func main(){
     a := MyStruct{Foo: "foobar"}
     b := MyStruct{Bar: 2}
-    defaultprops.Substitute(&a, &b)
+    defaultprops.SubstituteNonConfig(&a, &b)
     fmt.Println(b.Foo, b.Bar) // foobar 2
 }
 ```

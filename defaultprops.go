@@ -16,6 +16,7 @@ var (
 // Config is the config for the package
 // It allows to handle special cases, such as:
 // - boolean substitution
+// NOTE: not used yet
 type Config struct {
 	SetFalseBools  bool
 	SetEmptyString bool
